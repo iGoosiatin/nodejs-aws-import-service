@@ -23,7 +23,10 @@
   },
   "homepage": "https://github.com/iGoosiatin/nodejs-aws-import-service#readme",
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0",
     "@types/jest": "^29.5.14",
+    "aws-cdk-lib": "^2.181.1",
     "dotenv": "^16.4.7",
     "eslint": "^9.20.1",
     "eslint-config-prettier": "^10.0.1",
@@ -32,5 +35,8 @@
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.24.1"
+  },
+  "dependencies": {
+    "@types/aws-lambda": "^8.10.147"
   }
 }
