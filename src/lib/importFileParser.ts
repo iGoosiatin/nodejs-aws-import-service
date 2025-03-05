@@ -1,5 +1,5 @@
 import { S3Event } from 'aws-lambda';
-import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, GetObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, TransactWriteCommand } from '@aws-sdk/lib-dynamodb';
 import crypto from 'crypto';
@@ -9,9 +9,11 @@ import { Product } from 'types';
 
 const productsTable = process.env.PRODUCTS_TABLE;
 const stocksTable = process.env.STOCKS_TABLE;
+const uploadDir = process.env.UPLOAD_DIR;
+const parsedDir = process.env.PARSED_DIR;
 
-if (!(productsTable && stocksTable)) {
-  throw new Error('No PRODUCTS_TABLE and STOCKS_TABLE environment variable found');
+if (!(productsTable && stocksTable && uploadDir && parsedDir)) {
+  throw new Error('No PRODUCTS_TABLE, STOCKS_TABLE, UPLOAD_DIR or PARSED_DIR environment variable found');
 }
 
 const s3Client = new S3Client({});
@@ -133,6 +135,30 @@ const handleFile = async (Bucket: string, Key: string): Promise<void> => {
     stream.on('error', reject);
     stream.on('end', async () => {
       await Promise.all(promises);
+
+      try {
+        // Move file to parsed folder
+        const newKey = Key.replace(uploadDir, parsedDir);
+
+        await s3Client.send(
+          new CopyObjectCommand({
+            Bucket,
+            CopySource: `${Bucket}/${Key}`,
+            Key: newKey,
+          }),
+        );
+
+        // Delete from uploaded folder
+        await s3Client.send(
+          new DeleteObjectCommand({
+            Bucket,
+            Key,
+          }),
+        );
+      } catch (error) {
+        console.error('Error moving file:', error);
+      }
+
       resolve();
     });
   });

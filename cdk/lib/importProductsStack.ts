@@ -9,14 +9,23 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
 if (
-  !(process.env.AWS_BUCKET_NAME && process.env.UPLOAD_DIR && process.env.PRODUCTS_TABLE && process.env.STOCKS_TABLE)
+  !(
+    process.env.AWS_BUCKET_NAME &&
+    process.env.UPLOAD_DIR &&
+    process.env.PRODUCTS_TABLE &&
+    process.env.STOCKS_TABLE &&
+    process.env.PARSED_DIR
+  )
 ) {
-  throw new Error('No AWS_BUCKET_NAME, PRODUCTS_TABLE, STOCKS_TABLE or UPLOAD_DIR environment variable found');
+  throw new Error(
+    'No AWS_BUCKET_NAME, PRODUCTS_TABLE, STOCKS_TABLE, UPLOAD_DIR or PARSED_DIR environment variable found',
+  );
 }
 
 const environment = {
   AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
   UPLOAD_DIR: process.env.UPLOAD_DIR,
+  PARSED_DIR: process.env.PARSED_DIR,
   PRODUCTS_TABLE: process.env.PRODUCTS_TABLE,
   STOCKS_TABLE: process.env.STOCKS_TABLE,
 };
@@ -69,8 +78,15 @@ export class ImportProductsStack extends cdk.Stack {
 
     // Grant permissions to read from uploaded folder
     const s3ParserPolicy = new iam.PolicyStatement({
-      actions: ['s3:GetObject'],
-      resources: [`${bucket.bucketArn}/${environment.UPLOAD_DIR}/*`],
+      effect: iam.Effect.ALLOW,
+      actions: ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket'],
+      resources: [
+        // Permission for the bucket itself (for ListBucket)
+        bucket.bucketArn,
+        // Permissions for objects in both directories
+        `${bucket.bucketArn}/${environment.UPLOAD_DIR}/*`,
+        `${bucket.bucketArn}/${environment.PARSED_DIR}/*`,
+      ],
     });
 
     parserFunction.addToRolePolicy(s3ParserPolicy);
