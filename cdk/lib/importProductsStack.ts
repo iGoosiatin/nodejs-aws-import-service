@@ -4,11 +4,22 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apigatewayv2_integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 
-if (!process.env.AWS_BUCKET_NAME) {
-  throw new Error('No AWS_BUCKET_NAME environment variable found');
+if (
+  !(process.env.AWS_BUCKET_NAME && process.env.UPLOAD_DIR && process.env.PRODUCTS_TABLE && process.env.STOCKS_TABLE)
+) {
+  throw new Error('No AWS_BUCKET_NAME, PRODUCTS_TABLE, STOCKS_TABLE or UPLOAD_DIR environment variable found');
 }
-const AWS_BUCKET_NAME = process.env.AWS_BUCKET_NAME;
+
+const environment = {
+  AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
+  UPLOAD_DIR: process.env.UPLOAD_DIR,
+  PRODUCTS_TABLE: process.env.PRODUCTS_TABLE,
+  STOCKS_TABLE: process.env.STOCKS_TABLE,
+};
 
 export class ImportProductsStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
@@ -16,21 +27,58 @@ export class ImportProductsStack extends cdk.Stack {
 
     // Import existing bucket
     const bucket = s3.Bucket.fromBucketAttributes(this, 'ImportS3Bucket', {
-      bucketName: AWS_BUCKET_NAME,
+      bucketName: environment.AWS_BUCKET_NAME,
     });
 
-    // Create Lambda Function
+    // Reference DynamoDB tables
+    const productsTable = dynamodb.Table.fromTableName(this, 'ProductsTable', environment.PRODUCTS_TABLE);
+    const stocksTable = dynamodb.Table.fromTableName(this, 'StocksTable', environment.STOCKS_TABLE);
+
+    // Create import lambda Function
     const importFunction = new lambda.Function(this, 'ImportProductsFileFunction', {
       runtime: lambda.Runtime.NODEJS_22_X,
       handler: 'lib/importProductsFile.handler',
       code: lambda.Code.fromAsset('build'),
-      environment: {
-        AWS_BUCKET_NAME,
-      },
+      environment,
+    });
+
+    // Create file parser lambda function
+    const parserFunction = new lambda.Function(this, 'ProductsParserFunction', {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: 'lib/importFileParser.handler',
+      code: lambda.Code.fromAsset('build', {
+        bundling: {
+          image: lambda.Runtime.NODEJS_22_X.bundlingImage,
+          command: [
+            'bash',
+            '-c',
+            ['cp -r . /tmp', 'cd /tmp', 'npm install csv-parse', 'cp -r . /asset-output/'].join(' && '),
+          ],
+          user: 'root',
+        },
+      }),
+      environment,
     });
 
     // Grant Lambda permissions to access S3
     bucket.grantReadWrite(importFunction);
+
+    // Grant Lambda permissions to put data to DB
+    productsTable.grantWriteData(parserFunction);
+    stocksTable.grantWriteData(parserFunction);
+
+    // Grant permissions to read from uploaded folder
+    const s3ParserPolicy = new iam.PolicyStatement({
+      actions: ['s3:GetObject'],
+      resources: [`${bucket.bucketArn}/${environment.UPLOAD_DIR}/*`],
+    });
+
+    parserFunction.addToRolePolicy(s3ParserPolicy);
+
+    // Add S3 notification for uploaded files
+    bucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.LambdaDestination(parserFunction), {
+      prefix: `${environment.UPLOAD_DIR}/`,
+    });
 
     // Create HTTP API
     const httpApi = new apigatewayv2.HttpApi(this, 'ImportApi', {

@@ -4,18 +4,18 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { headers } from './helpers';
 
 const BUCKET = process.env.AWS_BUCKET_NAME;
-const UPLOAD_FOLDER = 'uploaded';
+const UPLOAD_DIR = process.env.UPLOAD_DIR;
 
-if (!BUCKET) {
-  throw new Error('No AWS_BUCKET_NAME environment variable found');
+if (!(process.env.AWS_BUCKET_NAME && process.env.UPLOAD_DIR)) {
+  throw new Error('No AWS_BUCKET_NAME or UPLOAD_DIR environment variable found');
 }
 
-const generateSignedUrl = async (fileName: string): Promise<string> => {
-  const s3Client = new S3Client({});
+const s3Client = new S3Client({});
 
+const generateSignedUrl = async (fileName: string): Promise<string> => {
   const command = new PutObjectCommand({
     Bucket: BUCKET,
-    Key: `${UPLOAD_FOLDER}/${fileName}`,
+    Key: `${UPLOAD_DIR}/${fileName}`,
     ContentType: 'text/csv',
   });
 
