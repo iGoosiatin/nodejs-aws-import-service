@@ -1,0 +1,36 @@
+{
+  "name": "nodejs-aws-import-service",
+  "version": "1.0.0",
+  "description": "Rolling Scopes School. Cloud developer course, 2025",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint .",
+    "build": "tsc",
+    "cdk:bootstrap": "npx cdk bootstrap",
+    "cdk:deploy": "npm run build && npx cdk deploy",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iGoosiatin/nodejs-aws-import-service.git"
+  },
+  "author": "Ilja Gusiatin",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iGoosiatin/nodejs-aws-import-service/issues"
+  },
+  "homepage": "https://github.com/iGoosiatin/nodejs-aws-import-service#readme",
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "dotenv": "^16.4.7",
+    "eslint": "^9.20.1",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.1"
+  }
+}
